@@ -1,3 +1,5 @@
+require "json"
+
 class Hangman
   $words_file_name = "5desk.txt"
   $default_max_mistakes = 6
@@ -13,6 +15,7 @@ class Hangman
   public
 
   def game
+    puts "Note: You can save and load your progress with the appropriate commands + save file name."
     until game_end?
       print_status
       user_char = user_input
@@ -39,13 +42,33 @@ class Hangman
   private
 
   def user_input
-    print "Type your char: "
+    print "Type your char or command: "
+    wrong_input_flag = true
     input = gets.chomp
-    until input.length == 1 && input.downcase.ord.between?(97, 122)
-      print "Wrong input! Type 1 latin alphabetic char: "
+    loop do
+      return input.downcase if input.length == 1 && input.downcase.ord.between?(97, 122)
+      if input.match?(/save .+/) || input.match?(/load .+/)
+        command, filename = input.split(" ", 2)
+        unless filename == filename.match(/[a-zA-Z0-9_\-]+/)[0]
+          print "Wrong filename, it may contain [a-zA-Z0-9_-]! Type 1 latin alphabetic char or command: "
+          input = gets.chomp
+          next
+        end
+        if command == "save"
+          game_save(filename)
+          puts "Game saved!"
+        elsif command == "load"
+          game_load!(filename)
+          puts "Game loaded!"
+          print_status
+        end
+        print "Type your char or command: "
+        input = gets.chomp
+        next
+      end
+      print "Wrong input! Type 1 latin alphabetic char or command: "
       input = gets.chomp
     end
-    input.downcase
   end
 
   def get_random_word
@@ -79,6 +102,35 @@ class Hangman
     @word.chars.uniq.each { |char| return false unless @true_chars.include?(char) }
     @victory = true
     true
+  end
+
+  def game_save(save_name)
+    Dir.mkdir("saves") unless Dir.exists?("saves")
+    file = File.open("saves/#{save_name}.json", File::CREAT | File::TRUNC | File::WRONLY)
+    file.write JSON.dump({
+      :true_chars => @true_chars,
+      :false_chars => @false_chars,
+      :word => @word,
+      :max_mistakes => @max_mistakes,
+    })
+    file.close
+  end
+
+  def self.game_load(save_name)
+    game = self.new
+    game.game_load!(save_name)
+    game
+  end
+
+  def game_load!(save_name)
+    Exception.new("Save file not found!") unless File.exists?("saves/#{save_name}.json")
+    file = File.open("saves/#{save_name}.json", File::RDONLY)
+    dump = JSON.load(file.read, :symbolize_names => true)
+    @true_chars = dump["true_chars"]
+    @false_chars = dump["false_chars"]
+    @word = dump["word"]
+    @max_mistakes = dump["max_mistakes"]
+    file.close
   end
 end
 
